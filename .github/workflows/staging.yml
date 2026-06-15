@@ -1,0 +1,68 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - staging
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Debug Host
+        run: |
+          echo "Host: ${{ secrets.SSH_HOST_DEV }}"
+          nslookup ${{ secrets.SSH_HOST_DEV }} || true
+
+      - name: Check SSH Port
+        run: |
+          echo "Checking SSH connectivity..."
+          timeout 15 bash -c "</dev/tcp/${{ secrets.SSH_HOST_DEV }}/22" \
+            && echo "Port 22 OPEN" \
+            || echo "Port 22 CLOSED or UNREACHABLE"
+
+      - name: Copy files to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST_DEV }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: ".,!node_modules,!venv,!.git"
+          target: "/home/apps/duluin_ml_kit"
+          overwrite: true
+          rm: true
+
+      - name: Build and Restart Docker on Server
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.SSH_HOST_DEV }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -e
+
+            cd /home/apps/duluin_ml_kit
+
+            echo "Current directory:"
+            pwd
+
+            echo "Docker version:"
+            docker --version
+
+            echo "Docker Compose version:"
+            docker compose version
+
+            echo "Building and starting containers..."
+            docker compose up -d --build
+
+            echo "Container status:"
+            docker compose ps
+
+            echo "Cleaning old Docker cache..."
+            docker system prune -f
+
+            echo "Deployment completed."
