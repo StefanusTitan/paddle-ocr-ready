@@ -1,8 +1,15 @@
+import json
+import os
+import httpx
 from fastapi import APIRouter, UploadFile, File, Request
 from app.schemas.ocr import OCRTextLine, OCRResult
 from app.utils.response import success_response, error_response
+from dotenv import load_dotenv
+
+load_dotenv()
 
 router = APIRouter()
+LLM_URL_API = os.getenv("LLM_URL_API")
 
 
 @router.post("/predict")
@@ -29,13 +36,81 @@ async def predict(request: Request, file: UploadFile = File(...)):
         )
 
     text_lines = [OCRTextLine(**line) for line in raw_lines]
-    result = OCRResult(
+    ocr_result = OCRResult(
         filename=file.filename or "unknown",
         text_lines=text_lines,
         total_lines=len(text_lines),
     )
+    
+    # return success_response(
+    #     message="OCR completed successfully.",
+    #     result=ocr_result.model_dump(),
+    # )
+
+    prompt = (
+        "Tentukan tipe klaim (Makan, Transportasi, Akomodasi, Lain-lain, Office Operational Transport, "
+        "Legal & Administration Fee, Office Supplies & Equipment, Software Subscription, Marketing & Promotion, "
+        "atau Business Meal & Entertain), deskripsi pengeluaran, tanggal transaksi, dan total jumlah uang yang dikeluarkan, "
+        "berdasarkan hasil OCR berikut. Output MUST be in raw JSON format matching this schema: "
+        '{"claim_type": "string", "description": "string", "transaction_date": "string", "total_amount": float}'
+    )
+
+    ocr_text = "\n".join([line.text for line in text_lines])
+    full_prompt = f"{prompt}\n\nOCR Result:\n{ocr_text}"
+    print("OCR result:", ocr_text)
+    # Call the local Ollama LLM API (POST /api/chat)
+    llm_api_url = f"{LLM_URL_API}/chat"
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                llm_api_url,
+                headers={"Content-Type": "application/json"},
+                json={
+                    "model": "qwen3.5:0.8b",
+                    "messages": [
+                        {"role": "system", "content": "You are a helpful assistant that extracts data into JSON. Do not include any explanations or thinking process."},
+                        {"role": "user", "content": full_prompt},
+                        {"role": "assistant", "content": "{\n  \"claim_type\":"}
+                    ],
+                    # "format": "json", # Disable JSON format enforcement as it can cause reasoning models to loop indefinitely
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.0,
+                        "num_predict": 300
+                    }
+                },
+            )
+            response.raise_for_status()
+            llm_data = response.json()
+            llm_text = llm_data.get("message", {}).get("content", "")
+            
+            # Since we pre-filled the assistant response, we need to prepend it back to the output
+            if not llm_text.strip().startswith("{"):
+                llm_text = "{\n  \"claim_type\":" + llm_text
+
+            # Try to parse a JSON object from the LLM text
+            try:
+                llm_analysis = json.loads(llm_text)
+            except json.JSONDecodeError:
+                llm_analysis = {"raw_response": llm_text, "full_data": llm_data}
+
+    except httpx.HTTPStatusError as e:
+        return error_response(
+            message="LLM analysis failed.",
+            errors={"detail": str(e), "status_code": e.response.status_code},
+            status_code=502,
+        )
+    except Exception as e:
+        return error_response(
+            message="LLM analysis failed.",
+            errors={"detail": str(e)},
+            status_code=500,
+        )
 
     return success_response(
-        message="OCR completed successfully.",
-        result=result.model_dump(),
+        message="OCR and LLM analysis completed successfully.",
+        result={
+            "ocr": ocr_result.model_dump(),
+            "analysis": llm_analysis
+        },
     )
