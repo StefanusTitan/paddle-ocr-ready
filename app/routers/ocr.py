@@ -58,21 +58,22 @@ async def predict(request: Request, file: UploadFile = File(...)):
     ocr_text = "\n".join([line.text for line in text_lines])
     full_prompt = f"{prompt}\n\nOCR Result:\n{ocr_text}"
     print("OCR result:", ocr_text)
-    # Call the local Ollama LLM API (POST /api/chat)
-    llm_api_url = f"{LLM_URL_API}/chat"
+    # Call the local Ollama LLM API (POST /api/generate)
+    llm_api_url = f"{LLM_URL_API}/generate"
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
+            raw_prompt = (
+                "<|im_start|>system\nYou are a helpful assistant that extracts data into JSON. Do not include any explanations or thinking process.<|im_end|>\n"
+                f"<|im_start|>user\n{full_prompt}<|im_end|>\n"
+                "<|im_start|>assistant\n{\n  \"claim_type\":"
+            )
             response = await client.post(
                 llm_api_url,
                 headers={"Content-Type": "application/json"},
                 json={
                     "model": "qwen3.5:0.8b",
-                    "messages": [
-                        {"role": "system", "content": "You are a helpful assistant that extracts data into JSON. Do not include any explanations or thinking process."},
-                        {"role": "user", "content": full_prompt},
-                        {"role": "assistant", "content": "{\n  \"claim_type\":"}
-                    ],
-                    # "format": "json", # Disable JSON format enforcement as it can cause reasoning models to loop indefinitely
+                    "prompt": raw_prompt,
+                    "raw": True,
                     "stream": False,
                     "options": {
                         "temperature": 0.0,
@@ -82,7 +83,7 @@ async def predict(request: Request, file: UploadFile = File(...)):
             )
             response.raise_for_status()
             llm_data = response.json()
-            llm_text = llm_data.get("message", {}).get("content", "")
+            llm_text = llm_data.get("response", "")
             
             # Since we pre-filled the assistant response, we need to prepend it back to the output
             if not llm_text.strip().startswith("{"):
