@@ -3,6 +3,11 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 name = "pypi"
 
+[[source]]
+url = "https://www.paddlepaddle.org.cn/packages/stable/cpu/"
+verify_ssl = true
+name = "wwwpaddlepaddleorg"
+
 [packages]
 fastapi = "*"
 uvicorn = { version = "*", extras = ["standard"] }
@@ -16,6 +21,10 @@ pydantic-settings = "*"
 python-dotenv = "*"
 python-multipart = "*"
 loguru = "*"
+paddleocr = "*"
+paddlepaddle = { version = "==3.2.0", index = "wwwpaddlepaddleorg" }
+pyrefly = "*"
+paddlex = "*"
 
 [dev-packages]
 pytest = "*"

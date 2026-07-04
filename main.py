@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from app.routers import example
+from app.routers import example, ocr
+from app.services.ocr_service import OCRService
 from app.middlewares.log import LogMiddleware
 from app.exceptions.log import LogError
 from starlette.exceptions import HTTPException
@@ -12,8 +13,12 @@ from fastapi import APIRouter
 async def lifespan(app: FastAPI):
     # Initialize resources here
     print("Application starting...")
+    ocr_service = OCRService()
+    app.state.ocr_service = ocr_service
+    print("OCR pipeline loaded.")
     yield
     # Clean up resources here
+    ocr_service.close()
     print("Application shutting down...")
 
 app = FastAPI(lifespan=lifespan)
@@ -42,6 +47,11 @@ api_v1.include_router(
     example.router,
     tags=["Example"],
     prefix="/example",
+)
+api_v1.include_router(
+    ocr.router,
+    tags=["OCR"],
+    prefix="/ocr",
 )
 
 app.include_router(api_v1)
