@@ -1,0 +1,15 @@
+{
+    "input_path": "./test_image/invoice_test.webp",
+    "page_index": null,
+    "class_ids": [
+        [
+            1
+        ]
+    ],
+    "scores": [
+        0.7782099843025208
+    ],
+    "label_names": [
+        "180_degree"
+    ]
+}
