@@ -18,7 +18,6 @@ class OCRService:
     def __init__(self) -> None:
         logger.info("Initializing PaddleOCR pipeline (PP-OCRv6 small)...")
         self.pipeline = PaddleOCR(
-            ocr_version="PP-OCRv6",
             device="cpu",
             engine="paddle_static",
             text_detection_model_name="PP-OCRv6_tiny_det",

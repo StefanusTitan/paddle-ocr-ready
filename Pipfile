@@ -10,7 +10,10 @@ name = "wwwpaddlepaddleorg"
 
 [packages]
 fastapi = "*"
-uvicorn = { version = "*", extras = ["standard"] }
+uvicorn = "*"
+uvloop = {version = "*", sys_platform = "!= 'win32'"}
+httptools = {version = "*", sys_platform = "!= 'win32'"}
+watchfiles = "*"
 sqlalchemy = "*"
 alembic = "*"
 psycopg2-binary = "*"
@@ -26,6 +29,10 @@ paddlepaddle = { version = "==3.2.0", index = "wwwpaddlepaddleorg" }
 pyrefly = "*"
 paddlex = "*"
 httpx = "*"
+pymupdf = "*"
+python-docx = "*"
+pillow = "*"
+dateparser = "*"
 
 [dev-packages]
 pytest = "*"

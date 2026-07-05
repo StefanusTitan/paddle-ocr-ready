@@ -5,6 +5,7 @@ from fastapi import APIRouter, UploadFile, File, Request
 from app.schemas.ocr import OCRTextLine, OCRResult
 from app.utils.response import success_response, error_response
 from app.utils.date import normalize_date
+from app.utils import document_parser
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -18,20 +19,55 @@ async def predict(request: Request, file: UploadFile = File(...)):
     """Run OCR on an uploaded image and return detected text lines."""
     ocr_service = request.app.state.ocr_service
 
-    if file.content_type and not file.content_type.startswith("image/"):
+    supported_types = [
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ]
+    if file.content_type and not (file.content_type.startswith("image/") or file.content_type in supported_types):
         return error_response(
-            message="Uploaded file is not an image.",
+            message="Uploaded file is not a supported format.",
             errors={"content_type": file.content_type},
             status_code=400,
         )
 
-    image_bytes = await file.read()
+    file_bytes = await file.read()
+    raw_lines = []
 
     try:
-        raw_lines = ocr_service.process_image(image_bytes)
+        content_type = file.content_type or ""
+        
+        if content_type == "image/gif":
+            processed_bytes = document_parser.process_gif(file_bytes)
+            raw_lines = ocr_service.process_image(processed_bytes)
+            
+        elif content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+            extracted_text = document_parser.process_docx(file_bytes)
+            raw_lines = [{"text": line, "confidence": 1.0, "bbox": []} for line in extracted_text.split("\n") if line.strip()]
+            
+        elif content_type == "application/msword":
+            extracted_text = document_parser.process_doc(file_bytes)
+            raw_lines = [{"text": line, "confidence": 1.0, "bbox": []} for line in extracted_text.split("\n") if line.strip()]
+            
+        elif content_type == "application/pdf":
+            is_scanned, result = document_parser.process_pdf(file_bytes)
+            if not is_scanned:
+                # result is a string of extracted text
+                extracted_text = result
+                raw_lines = [{"text": line, "confidence": 1.0, "bbox": []} for line in extracted_text.split("\n") if line.strip()]
+            else:
+                # result is a list of image bytes
+                for img_bytes in result:
+                    page_lines = ocr_service.process_image(img_bytes)
+                    raw_lines.extend(page_lines)
+                    
+        else:
+            # Standard image (jpg, png, webp, etc.)
+            raw_lines = ocr_service.process_image(file_bytes)
+            
     except Exception as e:
         return error_response(
-            message="OCR processing failed.",
+            message="Document processing failed.",
             errors={"detail": str(e)},
             status_code=500,
         )

@@ -3,36 +3,13 @@ version: "3.8"
 services:
   duluin_ml_kit:
     build: .
-    cpus: 0.50
-    mem_limit: 1024m
-    mem_reservation: 512m
-    pids_limit: 128
     ports:
       - "8001:8001"
     restart: always
     env_file:
       - ./environment/.env.staging
-    environment:
-      OMP_NUM_THREADS: "1"
-      MKL_NUM_THREADS: "1"
-      OPENBLAS_NUM_THREADS: "1"
-      NUMEXPR_NUM_THREADS: "1"
-      VECLIB_MAXIMUM_THREADS: "1"
-      BLIS_NUM_THREADS: "1"
-      TF_NUM_INTRAOP_THREADS: "1"
-      TF_NUM_INTEROP_THREADS: "1"
-      UVICORN_WORKERS: "1"
-      FACE_INFERENCE_QUEUE_SIZE: "32"
-      FACE_INFERENCE_TIMEOUT: "120"
+
     volumes:
       - ./face_datasets:/app/face_datasets
       - ./logs:/app/logs
       - ./vector_db:/app/vector_db
-    networks:
-      - apigateway_internal_network
-      - duluin_ml_kit_network
-
-networks:
-  duluin_ml_kit_network:
-  apigateway_internal_network:
-    external: true
