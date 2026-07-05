@@ -1,12 +1,7 @@
 import os
-import tempfile
 import logging
-from pathlib import Path
-
-# Disable MKL-DNN before any PaddlePaddle import to avoid OneDNN
-# NotImplementedError with pir::ArrayAttribute on CPU.
-os.environ["FLAGS_use_mkldnn"] = "0"
-
+import cv2
+import numpy as np
 from paddleocr import PaddleOCR
 
 logger = logging.getLogger(__name__)
@@ -21,23 +16,21 @@ class OCRService:
     """
 
     def __init__(self) -> None:
-        logger.info("Initializing PaddleOCR pipeline (PP-OCRv6 small, lang=id)...")
+        logger.info("Initializing PaddleOCR pipeline (PP-OCRv6 small)...")
         self.pipeline = PaddleOCR(
             ocr_version="PP-OCRv6",
-            lang="id",
+            device="cpu",
+            engine="paddle_static",
             text_detection_model_name="PP-OCRv6_small_det",
             text_recognition_model_name="PP-OCRv6_small_rec",
             use_doc_orientation_classify=True,
             use_doc_unwarping=False,
             use_textline_orientation=True,
-            text_det_limit_side_len=1280,
-            text_det_limit_type="max",
-            text_det_thresh=0.25,
-            text_det_box_thresh=0.45,
-            text_det_unclip_ratio=2.2,
-            text_rec_score_thresh=0.35,
-            text_recognition_batch_size=16,
-            textline_orientation_batch_size=16,
+            text_det_limit_side_len=960,
+            text_det_limit_type="min",
+            text_rec_score_thresh=0.5,
+            # text_recognition_batch_size=16,
+            # textline_orientation_batch_size=16,
             enable_hpi=False,
             enable_mkldnn=True,
         )
@@ -62,14 +55,12 @@ class OCRService:
         return self._run_pipeline(image)
 
     def _process_bytes(self, image_bytes: bytes) -> list[dict]:
-        """Handle in-memory image bytes via a temporary file."""
-        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-            tmp.write(image_bytes)
-            tmp_path = tmp.name
-        try:
-            return self._run_pipeline(tmp_path)
-        finally:
-            Path(tmp_path).unlink(missing_ok=True)
+        """Handle in-memory image bytes directly, no disk round-trip."""
+        arr = np.frombuffer(image_bytes, dtype=np.uint8)
+        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if img is None:
+            raise ValueError("Failed to decode image bytes")
+        return self._run_pipeline(img)
 
     def _run_pipeline(self, image_path: str) -> list[dict]:
         """Execute the OCR pipeline on a file path."""
