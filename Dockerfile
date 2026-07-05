@@ -82,7 +82,7 @@ ENV TF_NUM_INTEROP_THREADS=1
 # ---- Paddle Safety ----
 ENV DISABLE_MODEL_SOURCE_CHECK=True
 ENV FLAGS_use_cuda=False
-ENV FLAGS_use_mkldnn=False
+ENV FLAGS_use_mkldnn=True
 
 # ---- Silence Logs ----
 ENV TF_CPP_MIN_LOG_LEVEL=2
