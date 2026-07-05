@@ -1,7 +1,7 @@
 import json
 import os
 import httpx
-from fastapi import APIRouter, UploadFile, File, Request
+from fastapi import APIRouter, UploadFile, File, Request, Form
 from app.schemas.ocr import OCRTextLine, OCRResult
 from app.utils.response import success_response, error_response
 from app.utils.date import normalize_date
@@ -15,7 +15,7 @@ LLM_URL_API = os.getenv("LLM_URL_API")
 
 
 @router.post("/predict")
-async def predict(request: Request, file: UploadFile = File(...)):
+async def predict(request: Request, file: UploadFile = File(...), main_claim_type: str = Form("expense")):
     """Run OCR on an uploaded image and return detected text lines."""
     ocr_service = request.app.state.ocr_service
 
@@ -84,24 +84,49 @@ async def predict(request: Request, file: UploadFile = File(...)):
     #     result=ocr_result.model_dump(),
     # )
 
-    prompt = (
-        "Extract claim_type, description, transaction_date, and total_amount from this receipt OCR text. "
-        "Return transaction_date exactly as it appears on the receipt. "
-        "claim_type must be one of: Makan, Transportasi, Akomodasi, Lain-lain, Office Operational Transport, "
-        "Legal & Administration Fee, Office Supplies & Equipment, Software Subscription, Marketing & Promotion, "
-        "Business Meal & Entertain."
-    )
+    if main_claim_type == "advance":
+        prompt = (
+            "Extract purpose of advance, total amount, and payment method from this text. "
+            "Payment method must be one of: Bank Transfer, Cash, Virtual Account."
+        )
+        # GBNF grammar for advance claim
+        json_grammar = r'''
+            root ::= "{" ws "\"purpose\"" ws ":" ws string "," ws "\"total_amount\"" ws ":" ws number "," ws "\"payment_method\"" ws ":" ws string ws "}"
+            string ::= "\"" ([^"\\] | "\\" .)* "\""
+            number ::= "-"? [0-9]+ ("." [0-9]+)?
+            ws ::= [ \t\n]*
+        '''.strip()
+    elif main_claim_type == "travel":
+        prompt = (
+            "Extract destination, description, and ID type from this text. "
+            "ID type must be one of: KTP, SIM, or Passport."
+        )
+        # GBNF grammar for travel claim
+        json_grammar = r'''
+            root ::= "{" ws "\"destination\"" ws ":" ws string "," ws "\"description\"" ws ":" ws string "," ws "\"id_type\"" ws ":" ws string ws "}"
+            string ::= "\"" ([^"\\] | "\\" .)* "\""
+            number ::= "-"? [0-9]+ ("." [0-9]+)?
+            ws ::= [ \t\n]*
+        '''.strip()
+    else:
+        prompt = (
+            "Extract claim_type, description, transaction_date, and total_amount from this receipt OCR text. "
+            "Return transaction_date exactly as it appears on the receipt. "
+            "claim_type must be one of: Makan, Transportasi, Akomodasi, Lain-lain, Office Operational Transport, "
+            "Legal & Administration Fee, Office Supplies & Equipment, Software Subscription, Marketing & Promotion, "
+            "Business Meal & Entertain."
+        )
+        # GBNF grammar to constrain output to valid JSON matching our schema
+        json_grammar = r'''
+            root ::= "{" ws "\"claim_type\"" ws ":" ws string "," ws "\"description\"" ws ":" ws string "," ws "\"transaction_date\"" ws ":" ws string "," ws "\"total_amount\"" ws ":" ws number ws "}"
+            string ::= "\"" ([^"\\] | "\\" .)* "\""
+            number ::= "-"? [0-9]+ ("." [0-9]+)?
+            ws ::= [ \t\n]*
+        '''.strip()
 
     ocr_text = "\n".join([line.text for line in text_lines])
     full_prompt = f"{prompt}\n\n{ocr_text}"
     print("OCR result:", ocr_text)
-    # GBNF grammar to constrain output to valid JSON matching our schema
-    json_grammar = r'''
-        root ::= "{" ws "\"claim_type\"" ws ":" ws string "," ws "\"description\"" ws ":" ws string "," ws "\"transaction_date\"" ws ":" ws string "," ws "\"total_amount\"" ws ":" ws number ws "}"
-        string ::= "\"" ([^"\\] | "\\" .)* "\""
-        number ::= "-"? [0-9]+ ("." [0-9]+)?
-        ws ::= [ \t\n]*
-    '''.strip()
 
     # Call the local llama.cpp server API (POST /completion)
     llm_api_url = f"{LLM_URL_API}/completion"
