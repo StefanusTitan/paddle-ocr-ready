@@ -48,48 +48,50 @@ async def predict(request: Request, file: UploadFile = File(...)):
     # )
 
     prompt = (
-        "Tentukan tipe klaim (Makan, Transportasi, Akomodasi, Lain-lain, Office Operational Transport, "
+        "Extract claim_type, description, transaction_date, and total_amount from this receipt OCR text. "
+        "claim_type must be one of: Makan, Transportasi, Akomodasi, Lain-lain, Office Operational Transport, "
         "Legal & Administration Fee, Office Supplies & Equipment, Software Subscription, Marketing & Promotion, "
-        "atau Business Meal & Entertain), deskripsi pengeluaran, tanggal transaksi, dan total jumlah uang yang dikeluarkan, "
-        "berdasarkan hasil OCR berikut. Output MUST be in raw JSON format matching this schema: "
-        '{"claim_type": "string", "description": "string", "transaction_date": "string", "total_amount": float}'
+        "Business Meal & Entertain."
     )
 
     ocr_text = "\n".join([line.text for line in text_lines])
-    full_prompt = f"{prompt}\n\nOCR Result:\n{ocr_text}"
+    full_prompt = f"{prompt}\n\n{ocr_text}"
     print("OCR result:", ocr_text)
-    # Call the local Ollama LLM API (POST /api/generate)
-    llm_api_url = f"{LLM_URL_API}/generate"
+    # GBNF grammar to constrain output to valid JSON matching our schema
+    json_grammar = r'''
+        root ::= "{" ws "\"claim_type\"" ws ":" ws string "," ws "\"description\"" ws ":" ws string "," ws "\"transaction_date\"" ws ":" ws string "," ws "\"total_amount\"" ws ":" ws number ws "}"
+        string ::= "\"" ([^"\\] | "\\" .)* "\""
+        number ::= "-"? [0-9]+ ("." [0-9]+)?
+        ws ::= [ \t\n]*
+    '''.strip()
+
+    # Call the local llama.cpp server API (POST /completion)
+    llm_api_url = f"{LLM_URL_API}/completion"
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             raw_prompt = (
-                "<|im_start|>system\nYou are a helpful assistant that extracts data into JSON. Do not include any explanations or thinking process.<|im_end|>\n"
+                "<|im_start|>system\nExtract receipt data into JSON. No explanations.<|im_end|>\n"
                 f"<|im_start|>user\n{full_prompt}<|im_end|>\n"
-                "<|im_start|>assistant\n{\n  \"claim_type\":"
+                "<|im_start|>assistant\n"
             )
             response = await client.post(
                 llm_api_url,
                 headers={"Content-Type": "application/json"},
                 json={
-                    "model": "qwen3.5:0.8b",
                     "prompt": raw_prompt,
-                    "raw": True,
                     "stream": False,
-                    "options": {
-                        "temperature": 0.0,
-                        "num_predict": 300
-                    }
+                    "cache_prompt": True,
+                    "temperature": 0.0,
+                    "n_predict": 256,
+                    "grammar": json_grammar,
+                    "stop": ["<|im_end|>", "<|endoftext|>"],
                 },
             )
             response.raise_for_status()
             llm_data = response.json()
-            llm_text = llm_data.get("response", "")
-            
-            # Since we pre-filled the assistant response, we need to prepend it back to the output
-            if not llm_text.strip().startswith("{"):
-                llm_text = "{\n  \"claim_type\":" + llm_text
+            llm_text = llm_data.get("content", "")
 
-            # Try to parse a JSON object from the LLM text
+            # Grammar guarantees valid JSON, but parse defensively
             try:
                 llm_analysis = json.loads(llm_text)
             except json.JSONDecodeError:
