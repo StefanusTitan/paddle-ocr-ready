@@ -4,6 +4,7 @@ import httpx
 from fastapi import APIRouter, UploadFile, File, Request
 from app.schemas.ocr import OCRTextLine, OCRResult
 from app.utils.response import success_response, error_response
+from app.utils.date import normalize_date
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -49,6 +50,7 @@ async def predict(request: Request, file: UploadFile = File(...)):
 
     prompt = (
         "Extract claim_type, description, transaction_date, and total_amount from this receipt OCR text. "
+        "Return transaction_date exactly as it appears on the receipt. "
         "claim_type must be one of: Makan, Transportasi, Akomodasi, Lain-lain, Office Operational Transport, "
         "Legal & Administration Fee, Office Supplies & Equipment, Software Subscription, Marketing & Promotion, "
         "Business Meal & Entertain."
@@ -94,6 +96,11 @@ async def predict(request: Request, file: UploadFile = File(...)):
             # Grammar guarantees valid JSON, but parse defensively
             try:
                 llm_analysis = json.loads(llm_text)
+                # Normalize date in Python (faster than asking the LLM to format)
+                if "transaction_date" in llm_analysis:
+                    llm_analysis["transaction_date"] = normalize_date(
+                        llm_analysis["transaction_date"]
+                    )
             except json.JSONDecodeError:
                 llm_analysis = {"raw_response": llm_text, "full_data": llm_data}
 
