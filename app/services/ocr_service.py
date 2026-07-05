@@ -22,11 +22,11 @@ class OCRService:
             device="cpu",
             engine="paddle_static",
             text_detection_model_name="PP-OCRv6_tiny_det",
-            text_recognition_model_name="PP-OCRv6_small_rec",
+            text_recognition_model_name="PP-OCRv6_medium_rec",
             use_doc_orientation_classify=True,
             use_doc_unwarping=False,
             use_textline_orientation=False, # Invoice usually only horizontal texts (at least important ones we need to grab)
-            text_det_limit_side_len=1024,
+            text_det_limit_side_len=960,
             text_det_limit_type="min",
             text_rec_score_thresh=0.5,
             text_recognition_batch_size=8,
