@@ -27,7 +27,7 @@ class OCRService:
             use_doc_orientation_classify=True,
             use_doc_unwarping=False,
             use_textline_orientation=False, # Invoice usually only horizontal texts (at least important ones we need to grab)
-            text_det_limit_side_len=960,
+            text_det_limit_side_len=1280,
             text_det_limit_type="min",
             text_rec_score_thresh=0.5,
             text_recognition_batch_size=8,

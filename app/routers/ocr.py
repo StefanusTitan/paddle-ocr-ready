@@ -6,6 +6,7 @@ from fastapi import APIRouter, UploadFile, File, Request, Form
 from app.schemas.ocr import OCRTextLine, OCRResult
 from app.utils.response import success_response, error_response
 from app.utils.date import normalize_date
+from app.utils.amount import normalize_amount
 from app.utils import document_parser
 from dotenv import load_dotenv
 
@@ -104,17 +105,19 @@ async def predict(request: Request, file: UploadFile = File(...), main_claim_typ
     if main_claim_type == "advance":
         prompt = (
             "Extract purposes, amount, payment_method, and confidence. "
+            "amount: include currency if present. "
             "payment_method: Bank Transfer|Cash|Virtual Account."
         )
     elif main_claim_type == "travel":
         prompt = (
             "Extract purpose, description, budget_amount, mode_of_travel, is_roundtrip and confidence. "
+            "budget_amount: include currency if present. "
             "mode_of_travel: Plane|Train|Taxi|Bus|Car|Motorcycle|Other."
         )
     else:
         prompt = (
             "Extract invoice description, expense_date, amount, and confidence from this receipt. "
-            "amount: number, no currency. "
+            "amount: include currency if present. "
             "confidence: 0.0-1.0 based on accuracy."
         )
 
@@ -156,6 +159,12 @@ async def predict(request: Request, file: UploadFile = File(...), main_claim_typ
                     llm_analysis["expense_date"] = normalize_date(
                         llm_analysis["expense_date"]
                     )
+                # Normalize amount fields to clean decimal strings
+                for amount_key in ("amount", "budget_amount"):
+                    if amount_key in llm_analysis:
+                        llm_analysis[amount_key] = normalize_amount(
+                            llm_analysis[amount_key]
+                        )
             except json.JSONDecodeError:
                 llm_analysis = {"raw_response": llm_text, "full_data": llm_data}
 
