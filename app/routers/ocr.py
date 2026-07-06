@@ -118,7 +118,7 @@ async def predict(request: Request, file: UploadFile = File(...), main_claim_typ
             "confidence: 0.0-1.0 based on accuracy."
         )
 
-    ocr_text = "\n".join([line.text for line in text_lines])
+    ocr_text = "\n".join(line.text for line in text_lines).lower()
     full_prompt = f"{prompt}\n\n{ocr_text}"
     print("OCR result:", ocr_text)
 
