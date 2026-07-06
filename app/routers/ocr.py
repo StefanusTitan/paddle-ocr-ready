@@ -17,7 +17,7 @@ MODEL = os.getenv("MODEL", "qwen2.5:1.5b")
 
 
 @router.post("/predict")
-async def predict(request: Request, file: UploadFile = File(...), main_claim_type: str = Form("expense")):
+async def predict(request: Request, file: UploadFile = File(...), main_claim_type: str = Form(None)):
     """Run OCR on an uploaded image and return detected text lines."""
     req_start_time = time.time()
     ocr_service = request.app.state.ocr_service
@@ -87,25 +87,26 @@ async def predict(request: Request, file: UploadFile = File(...), main_claim_typ
         total_lines=len(text_lines),
     )
     
-    # return success_response(
-    #     message="OCR completed successfully.",
-    #     result=ocr_result.model_dump(),
-    # )
+    if not main_claim_type:
+        return success_response(
+            message="OCR completed successfully.",
+            result=ocr_result.model_dump(),
+        )
 
     if main_claim_type == "advance":
         prompt = (
-            "Extract purpose, total_amount, and payment_method. "
+            "Extract purposes, amount, payment_method, and confidence. "
             "payment_method: Bank Transfer|Cash|Virtual Account."
         )
     elif main_claim_type == "travel":
         prompt = (
-            "Extract destination, description, and id_type. "
-            "id_type: KTP|SIM|Passport."
+            "Extract purpose, description, budget_amount, mode_of_travel, is_roundtrip and confidence. "
+            "mode_of_travel: Plane|Train|Taxi|Bus|Car|Motorcycle|Other."
         )
     else:
         prompt = (
-            "Extract invoice description, date, total_amount, and confidence from this receipt. "
-            "date: as-is. total_amount: number, no currency. "
+            "Extract invoice description, expense_date, amount, and confidence from this receipt. "
+            "amount: number, no currency. "
             "confidence: 0.0-1.0 based on text clarity."
         )
 
@@ -143,9 +144,9 @@ async def predict(request: Request, file: UploadFile = File(...), main_claim_typ
             try:
                 llm_analysis = json.loads(llm_text)
                 # Normalize date in Python (faster than asking the LLM to format)
-                if "date" in llm_analysis:
-                    llm_analysis["date"] = normalize_date(
-                        llm_analysis["date"]
+                if "expense_date" in llm_analysis:
+                    llm_analysis["expense_date"] = normalize_date(
+                        llm_analysis["expense_date"]
                     )
             except json.JSONDecodeError:
                 llm_analysis = {"raw_response": llm_text, "full_data": llm_data}
