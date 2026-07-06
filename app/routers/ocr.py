@@ -1,5 +1,6 @@
 import json
 import os
+import time
 import httpx
 from fastapi import APIRouter, UploadFile, File, Request, Form
 from app.schemas.ocr import OCRTextLine, OCRResult
@@ -17,6 +18,7 @@ LLM_URL_API = os.getenv("LLM_URL_API")
 @router.post("/predict")
 async def predict(request: Request, file: UploadFile = File(...), main_claim_type: str = Form("expense")):
     """Run OCR on an uploaded image and return detected text lines."""
+    req_start_time = time.time()
     ocr_service = request.app.state.ocr_service
 
     supported_types = [
@@ -32,6 +34,8 @@ async def predict(request: Request, file: UploadFile = File(...), main_claim_typ
         )
 
     file_bytes = await file.read()
+    file_read_time = time.time()
+    print(f"[Latency] File read: {file_read_time - req_start_time:.4f}s")
     raw_lines = []
 
     try:
@@ -71,6 +75,9 @@ async def predict(request: Request, file: UploadFile = File(...), main_claim_typ
             errors={"detail": str(e)},
             status_code=500,
         )
+
+    ocr_done_time = time.time()
+    print(f"[Latency] OCR/Doc processing: {ocr_done_time - file_read_time:.4f}s")
 
     text_lines = [OCRTextLine(**line) for line in raw_lines]
     ocr_result = OCRResult(
@@ -130,6 +137,7 @@ async def predict(request: Request, file: UploadFile = File(...), main_claim_typ
 
     # Call the local llama.cpp server API (POST /completion)
     llm_api_url = f"{LLM_URL_API}/completion"
+    llm_start_time = time.time()
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             raw_prompt = (
@@ -177,6 +185,10 @@ async def predict(request: Request, file: UploadFile = File(...), main_claim_typ
             errors={"detail": str(e)},
             status_code=500,
         )
+
+    llm_end_time = time.time()
+    print(f"[Latency] LLM API Call: {llm_end_time - llm_start_time:.4f}s")
+    print(f"[Latency] Total Request: {llm_end_time - req_start_time:.4f}s")
 
     return success_response(
         message="OCR and LLM analysis completed successfully.",
