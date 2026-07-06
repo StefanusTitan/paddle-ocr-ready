@@ -22,8 +22,8 @@ class OCRService:
         self.pipeline = PaddleOCR(
             device="cpu",
             engine="onnxruntime",
-            text_detection_model_name="PP-OCRv6_medium_det",
-            text_recognition_model_name="PP-OCRv6_medium_rec",
+            text_detection_model_name="PP-OCRv6_small_det",
+            text_recognition_model_name="PP-OCRv6_small_rec",
             use_doc_orientation_classify=True,
             use_doc_unwarping=False,
             use_textline_orientation=False, # Invoice usually only horizontal texts (at least important ones we need to grab)
