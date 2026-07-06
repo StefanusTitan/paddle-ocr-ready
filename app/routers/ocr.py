@@ -51,8 +51,16 @@ async def predict(request: Request, file: UploadFile = File(...), main_claim_typ
             raw_lines = [{"text": line, "confidence": 1.0, "bbox": []} for line in extracted_text.split("\n") if line.strip()]
             
         elif content_type == "application/msword":
-            extracted_text = document_parser.process_doc(file_bytes)
-            raw_lines = [{"text": line, "confidence": 1.0, "bbox": []} for line in extracted_text.split("\n") if line.strip()]
+            is_scanned, result = document_parser.process_doc(file_bytes)
+            if not is_scanned:
+                # result is a string of extracted text
+                extracted_text = result
+                raw_lines = [{"text": line, "confidence": 1.0, "bbox": []} for line in extracted_text.split("\n") if line.strip()]
+            else:
+                # result is a list of image bytes
+                for img_bytes in result:
+                    page_lines = ocr_service.process_image(img_bytes)
+                    raw_lines.extend(page_lines)
             
         elif content_type == "application/pdf":
             is_scanned, result = document_parser.process_pdf(file_bytes)
@@ -107,7 +115,7 @@ async def predict(request: Request, file: UploadFile = File(...), main_claim_typ
         prompt = (
             "Extract invoice description, expense_date, amount, and confidence from this receipt. "
             "amount: number, no currency. "
-            "confidence: 0.0-1.0 based on text clarity."
+            "confidence: 0.0-1.0 based on accuracy."
         )
 
     ocr_text = "\n".join([line.text for line in text_lines])

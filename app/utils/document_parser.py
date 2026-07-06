@@ -27,8 +27,14 @@ def process_docx(file_bytes: bytes) -> str:
             full_text.append(para.text.strip())
     return "\n".join(full_text)
 
-def process_doc(file_bytes: bytes) -> str:
-    """Converts a DOC file to DOCX using headless LibreOffice and extracts text."""
+def process_doc(file_bytes: bytes) -> tuple[bool, str | list[bytes]]:
+    """
+    Converts a DOC file to DOCX using headless LibreOffice and extracts text.
+    Returns:
+        (is_scanned, result)
+        If is_scanned is False, result is the extracted text (str).
+        If is_scanned is True, result is a list of PNG image bytes (list[bytes]).
+    """
     with tempfile.TemporaryDirectory() as temp_dir:
         doc_path = os.path.join(temp_dir, "temp.doc")
         with open(doc_path, "wb") as f:
@@ -54,7 +60,23 @@ def process_doc(file_bytes: bytes) -> str:
         with open(docx_path, "rb") as f:
             docx_bytes = f.read()
             
-        return process_docx(docx_bytes)
+        extracted_text = process_docx(docx_bytes)
+        
+        # If substantial text extracted, it's a digital document
+        if len(extracted_text.strip()) > 50:
+            print("THIS IS A DIGITAL DOC, NOT SCANNED")
+            return False, extracted_text
+        
+        # Otherwise, it's likely a scanned document - convert pages to images for OCR
+        image_bytes_list = []
+        doc = fitz.open(stream=docx_bytes, filetype="docx")
+        for page in doc:
+            # Render at a good resolution for OCR
+            mat = fitz.Matrix(2, 2)
+            pix = page.get_pixmap(matrix=mat, alpha=False)
+            image_bytes_list.append(pix.tobytes("png"))
+        
+        return True, image_bytes_list
 
 def process_pdf(file_bytes: bytes) -> tuple[bool, list[bytes] | str]:
     """
