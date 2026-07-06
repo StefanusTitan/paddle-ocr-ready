@@ -44,11 +44,6 @@ app.add_exception_handler(Exception, log.unhandled_exception_handler)
 # API v1 routes
 api_v1 = APIRouter(prefix="/api/v1")
 api_v1.include_router(
-    example.router,
-    tags=["Example"],
-    prefix="/example",
-)
-api_v1.include_router(
     ocr.router,
     tags=["OCR"],
     prefix="/ocr",
