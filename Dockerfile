@@ -3,7 +3,7 @@
 # =====================
 # Stage 1: Builder
 # =====================
-FROM python:3.10-slim AS builder
+FROM python:3.12-slim AS builder
 
 RUN apt-get update && apt-get install -y \
     build-essential \
@@ -24,13 +24,17 @@ RUN pipenv install --deploy --system
 # =====================
 # Stage 2: Runtime
 # =====================
-FROM python:3.10-slim
+FROM python:3.12-slim
 
 # ---- System Libraries (IMPORTANT) ----
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
+    libgl1-mesa-glx \
     libglib2.0-0 \
     libgomp1 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
     ffmpeg \
     wget \
     libreoffice \
@@ -41,7 +45,7 @@ ENV FFMPEG_PATH="/usr/bin/ffmpeg"
 WORKDIR /app
 
 # ---- Copy Python deps from builder ----
-COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # ---- Pre-download PaddleOCR models ----
