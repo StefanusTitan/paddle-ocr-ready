@@ -21,6 +21,7 @@ class OCRService:
         logger.info("Initializing PaddleOCR pipeline (PP-OCRv6 small)...")
         self.pipeline = PaddleOCR(
             device="cpu",
+            engine="onnxruntime",
             text_detection_model_name="PP-OCRv6_medium_det",
             text_recognition_model_name="PP-OCRv6_medium_rec",
             use_doc_orientation_classify=True,
@@ -32,7 +33,6 @@ class OCRService:
             text_recognition_batch_size=8,
             # textline_orientation_batch_size=8,
             enable_hpi=True, # Enable when in Linux and has GPU for performance improvement
-            enable_mkldnn=True,
         )
         logger.info("PaddleOCR pipeline initialized successfully.")
 
