@@ -86,11 +86,16 @@ ENV CUDA_VISIBLE_DEVICES=-1
 ENV FLAGS_use_cuda=False
 ENV FLAGS_use_mkldnn=False
 
-# ---- CPU Optimization ----
-# OpenBLAS thread optimization for AMD EPYC
-ENV OPENBLAS_NUM_THREADS=4
-ENV OMP_NUM_THREADS=4
-ENV MKL_NUM_THREADS=4
+# ---- CPU Optimization (AMD EPYC, 8 cores) ----
+ENV OMP_NUM_THREADS=8
+ENV ONNX_NUM_THREADS=8
+
+# EPYC NUMA awareness — pin threads to cores
+ENV OMP_PROC_BIND=close
+ENV OMP_PLACES=cores
+
+ENV OPENBLAS_NUM_THREADS=8
+ENV MKL_NUM_THREADS=8
 
 # ONNX Runtime specific
 ENV ONNXRUNTIME_DISABLE_CPU_AFFINITY=1
