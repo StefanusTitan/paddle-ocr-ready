@@ -27,6 +27,8 @@ RUN pipenv install --deploy --system
 FROM python:3.12-slim
 
 # ---- System Libraries (IMPORTANT) ----
+# Includes build-essential & cmake for PaddleX HPI (High Performance Inference)
+# JIT-compilation of optimized inference kernels at startup.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libgl1-mesa-glx \
@@ -38,6 +40,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     wget \
     libreoffice \
+    build-essential \
+    cmake \
     && rm -rf /var/lib/apt/lists/*
 
 ENV FFMPEG_PATH="/usr/bin/ffmpeg"
@@ -49,7 +53,21 @@ COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # ---- Pre-download PaddleOCR models ----
-
+# Initialize the pipeline once during build to download & cache all required
+# models (~500 MB).  This avoids a slow first-request download at runtime.
+ENV DISABLE_MODEL_SOURCE_CHECK=True
+RUN python -c "\
+from paddleocr import PaddleOCR; \
+ocr = PaddleOCR( \
+    device='cpu', \
+    engine='onnxruntime', \
+    text_detection_model_name='PP-OCRv6_medium_det', \
+    text_recognition_model_name='PP-OCRv6_medium_rec', \
+    use_doc_orientation_classify=True, \
+    use_doc_unwarping=False, \
+    use_textline_orientation=False, \
+    enable_hpi=True, \
+)"
 
 # ---- Copy Application ----
 COPY . .
@@ -59,8 +77,6 @@ COPY . .
 # Runtime Environment
 # =====================
 # ---- Disable GPU / CUDA ----
-# ===== Paddle / OpenMP Safety =====
-ENV DISABLE_MODEL_SOURCE_CHECK=True
 ENV CUDA_VISIBLE_DEVICES=-1
 
 # ---- Paddle Safety ----
