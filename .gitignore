@@ -144,3 +144,6 @@ dataset/
 faces/
 vector_db/
 datasets/
+
+# Command Code
+.commandcode

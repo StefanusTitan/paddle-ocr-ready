@@ -21,9 +21,8 @@ class OCRService:
         logger.info("Initializing PaddleOCR pipeline (PP-OCRv6 small)...")
         self.pipeline = PaddleOCR(
             device="cpu",
-            engine="paddle_static",
-            text_detection_model_name="PP-OCRv6_tiny_det",
-            text_recognition_model_name="PP-OCRv6_tiny_rec",
+            text_detection_model_name="PP-OCRv6_medium_det",
+            text_recognition_model_name="PP-OCRv6_medium_rec",
             use_doc_orientation_classify=True,
             use_doc_unwarping=False,
             use_textline_orientation=False, # Invoice usually only horizontal texts (at least important ones we need to grab)
@@ -32,7 +31,7 @@ class OCRService:
             text_rec_score_thresh=0.5,
             text_recognition_batch_size=8,
             # textline_orientation_batch_size=8,
-            enable_hpi=False, # Enable when in Linux and has GPU for performance improvement
+            enable_hpi=True, # Enable when in Linux and has GPU for performance improvement
             enable_mkldnn=True,
         )
         logger.info("PaddleOCR pipeline initialized successfully.")

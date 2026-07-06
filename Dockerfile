@@ -15,8 +15,6 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 RUN pip install --upgrade pip pipenv
-RUN pip install torch --index-url https://download.pytorch.org/whl/cpu
-RUN pip install torchvision --index-url https://download.pytorch.org/whl/cpu
 COPY Pipfile Pipfile.lock ./
 
 # Install dependencies system-wide
@@ -40,13 +38,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ENV FFMPEG_PATH="/usr/bin/ffmpeg"
 
-# ---- Preload DeepFace Weights ----
-RUN mkdir -p /root/.deepface/weights && \
-    wget https://github.com/serengil/deepface_models/releases/download/v1.0/arcface_weights.h5 \
-        -O /root/.deepface/weights/arcface_weights.h5 && \
-    wget https://github.com/serengil/deepface_models/releases/download/v1.0/retinaface.h5 \
-        -O /root/.deepface/weights/retinaface.h5
-
 WORKDIR /app
 
 # ---- Copy Python deps from builder ----
@@ -66,22 +57,9 @@ COPY . .
 # ---- Disable GPU / CUDA ----
 # ===== Paddle / OpenMP Safety =====
 ENV DISABLE_MODEL_SOURCE_CHECK=True
-ENV OMP_NUM_THREADS=1
-ENV MKL_NUM_THREADS=1
 ENV CUDA_VISIBLE_DEVICES=-1
 
-# ---- Thread Control ----
-ENV OMP_NUM_THREADS=1
-ENV MKL_NUM_THREADS=1
-ENV OPENBLAS_NUM_THREADS=1
-ENV NUMEXPR_NUM_THREADS=1
-ENV VECLIB_MAXIMUM_THREADS=1
-ENV BLIS_NUM_THREADS=1
-ENV TF_NUM_INTRAOP_THREADS=1
-ENV TF_NUM_INTEROP_THREADS=1
-
 # ---- Paddle Safety ----
-ENV DISABLE_MODEL_SOURCE_CHECK=True
 ENV FLAGS_use_cuda=False
 ENV FLAGS_use_mkldnn=True
 

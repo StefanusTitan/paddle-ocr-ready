@@ -33,10 +33,11 @@ pymupdf = "*"
 python-docx = "*"
 pillow = "*"
 dateparser = "*"
+onnxruntime = "*"
 
 [dev-packages]
 pytest = "*"
 ruff = "*"
 
 [requires]
-python_version = "3.11"
+python_version = "3.12"

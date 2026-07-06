@@ -13,6 +13,7 @@ load_dotenv()
 
 router = APIRouter()
 LLM_URL_API = os.getenv("LLM_URL_API")
+MODEL = os.getenv("MODEL", "qwen2.5:1.5b")
 
 
 @router.post("/predict")
@@ -93,82 +94,58 @@ async def predict(request: Request, file: UploadFile = File(...), main_claim_typ
 
     if main_claim_type == "advance":
         prompt = (
-            "Extract purpose of advance, total amount, and payment method from this text. "
-            "Payment method must be one of: Bank Transfer, Cash, Virtual Account."
+            "Extract purpose, total_amount, and payment_method. "
+            "payment_method: Bank Transfer|Cash|Virtual Account."
         )
-        # GBNF grammar for advance claim
-        json_grammar = r'''
-            root ::= "{" ws "\"purpose\"" ws ":" ws string "," ws "\"total_amount\"" ws ":" ws number "," ws "\"payment_method\"" ws ":" ws string ws "}"
-            string ::= "\"" ([^"\\] | "\\" .)* "\""
-            number ::= "-"? [0-9]+ ("." [0-9]+)?
-            ws ::= [ \t\n]*
-        '''.strip()
     elif main_claim_type == "travel":
         prompt = (
-            "Extract destination, description, and ID type from this text. "
-            "ID type must be one of: KTP, SIM, or Passport."
+            "Extract destination, description, and id_type. "
+            "id_type: KTP|SIM|Passport."
         )
-        # GBNF grammar for travel claim
-        json_grammar = r'''
-            root ::= "{" ws "\"destination\"" ws ":" ws string "," ws "\"description\"" ws ":" ws string "," ws "\"id_type\"" ws ":" ws string ws "}"
-            string ::= "\"" ([^"\\] | "\\" .)* "\""
-            number ::= "-"? [0-9]+ ("." [0-9]+)?
-            ws ::= [ \t\n]*
-        '''.strip()
     else:
         prompt = (
-            "Extract claim_type, description, transaction_date, and total_amount from this receipt OCR text. "
-            "Return transaction_date exactly as it appears on the receipt. "
-            "claim_type must be one of: Makan, Transportasi, Akomodasi, Lain-lain, Office Operational Transport, "
-            "Legal & Administration Fee, Office Supplies & Equipment, Software Subscription, Marketing & Promotion, "
-            "Business Meal & Entertain."
+            "Extract invoice description, date, total_amount, and confidence from this receipt. "
+            "date: as-is. total_amount: number, no currency. "
+            "confidence: 0.0-1.0 based on text clarity."
         )
-        # GBNF grammar to constrain output to valid JSON matching our schema
-        json_grammar = r'''
-            root ::= "{" ws "\"claim_type\"" ws ":" ws string "," ws "\"description\"" ws ":" ws string "," ws "\"transaction_date\"" ws ":" ws string "," ws "\"total_amount\"" ws ":" ws number ws "}"
-            string ::= "\"" ([^"\\] | "\\" .)* "\""
-            number ::= "-"? [0-9]+ ("." [0-9]+)?
-            ws ::= [ \t\n]*
-        '''.strip()
 
     ocr_text = "\n".join([line.text for line in text_lines])
     full_prompt = f"{prompt}\n\n{ocr_text}"
     print("OCR result:", ocr_text)
 
-    # Call the local llama.cpp server API (POST /completion)
-    llm_api_url = f"{LLM_URL_API}/completion"
+    # Call the Ollama API (POST /api/chat)
+    llm_api_url = f"{LLM_URL_API}/chat"
     llm_start_time = time.time()
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
-            raw_prompt = (
-                "<|im_start|>system\nExtract receipt data into JSON. No explanations.<|im_end|>\n"
-                f"<|im_start|>user\n{full_prompt}<|im_end|>\n"
-                "<|im_start|>assistant\n"
-            )
             response = await client.post(
                 llm_api_url,
                 headers={"Content-Type": "application/json"},
                 json={
-                    "prompt": raw_prompt,
+                    "model": MODEL,
+                    "messages": [
+                        {"role": "system", "content": "Extract receipt data into JSON. No explanations."},
+                        {"role": "user", "content": full_prompt},
+                    ],
                     "stream": False,
-                    "cache_prompt": True,
-                    "temperature": 0.0,
-                    "n_predict": 256,
-                    "grammar": json_grammar,
-                    "stop": ["<|im_end|>", "<|endoftext|>"],
+                    "format": "json",
+                    "options": {
+                        "temperature": 0.0,
+                        "num_predict": 254,
+                    },
                 },
             )
             response.raise_for_status()
             llm_data = response.json()
-            llm_text = llm_data.get("content", "")
+            llm_text = llm_data.get("message", {}).get("content", "")
 
-            # Grammar guarantees valid JSON, but parse defensively
+            # Ollama's format: json ensures valid JSON, but parse defensively
             try:
                 llm_analysis = json.loads(llm_text)
                 # Normalize date in Python (faster than asking the LLM to format)
-                if "transaction_date" in llm_analysis:
-                    llm_analysis["transaction_date"] = normalize_date(
-                        llm_analysis["transaction_date"]
+                if "date" in llm_analysis:
+                    llm_analysis["date"] = normalize_date(
+                        llm_analysis["date"]
                     )
             except json.JSONDecodeError:
                 llm_analysis = {"raw_response": llm_text, "full_data": llm_data}
