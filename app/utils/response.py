@@ -11,6 +11,7 @@ def create_response(
 ) -> JSONResponse:
     """Helper function to create a JSONResponse with a standardized format."""
     content = {
+        "success": True,
         "message": message,
         "result": result,
         "errors": errors
