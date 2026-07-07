@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.routers import example, ocr
+from app.routers.ocr import get_llm_client
 from app.services.ocr_service import OCRService
 from app.middlewares.log import LogMiddleware
 from app.exceptions.log import LogError
@@ -18,6 +19,8 @@ async def lifespan(app: FastAPI):
     logger.info("OCR pipeline loaded")
     yield
     ocr_service.close()
+    client = get_llm_client()
+    await client.aclose()
     logger.info("Application shutdown complete")
 
 app = FastAPI(lifespan=lifespan)
