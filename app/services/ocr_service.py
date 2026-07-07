@@ -25,7 +25,7 @@ class OCRService:
             text_detection_model_name="PP-OCRv6_small_det",
             text_recognition_model_name="PP-OCRv6_small_rec",
             use_doc_orientation_classify=True,
-            use_doc_unwarping=False,
+            use_doc_unwarping=True,
             use_textline_orientation=False, # Invoice usually only horizontal texts (at least important ones we need to grab)
             text_det_limit_side_len=1280,
             text_det_limit_type="min",
