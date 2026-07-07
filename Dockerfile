@@ -52,6 +52,11 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
+# ---- Install HPI dependencies for CPU ----
+# It's best to install HPI dependencies *before* initializing the pipeline, 
+# so that the JIT compiler has everything it needs when the engine is instantiated.
+RUN paddleocr install_hpi_deps cpu
+
 # ---- Pre-download PaddleOCR models ----
 # Initialize the pipeline once during build to download & cache all required
 # models (~500 MB).  This avoids a slow first-request download at runtime.
@@ -61,16 +66,13 @@ from paddleocr import PaddleOCR; \
 ocr = PaddleOCR( \
     device='cpu', \
     engine='onnxruntime', \
-    text_detection_model_name='PP-OCRv6_medium_det', \
-    text_recognition_model_name='PP-OCRv6_medium_rec', \
+    text_detection_model_name='PP-OCRv6_small_det', \
+    text_recognition_model_name='PP-OCRv6_small_rec', \
     use_doc_orientation_classify=True, \
-    use_doc_unwarping=False, \
+    use_doc_unwarping=True, \
     use_textline_orientation=False, \
     enable_hpi=True, \
 )"
-
-# ---- Install HPI dependencies for CPU ----
-RUN paddleocr install_hpi_deps cpu
 
 # ---- Copy Application ----
 COPY . .
@@ -86,16 +88,16 @@ ENV CUDA_VISIBLE_DEVICES=-1
 ENV FLAGS_use_cuda=False
 ENV FLAGS_use_mkldnn=False
 
-# ---- CPU Optimization (AMD EPYC, 8 cores) ----
-ENV OMP_NUM_THREADS=8
-ENV ONNX_NUM_THREADS=8
+# ---- CPU Optimization (Safe Defaults) ----
+ENV OMP_NUM_THREADS=2
+ENV ONNX_NUM_THREADS=2
 
 # EPYC NUMA awareness — pin threads to cores
 ENV OMP_PROC_BIND=close
 ENV OMP_PLACES=cores
 
-ENV OPENBLAS_NUM_THREADS=8
-ENV MKL_NUM_THREADS=8
+ENV OPENBLAS_NUM_THREADS=2
+ENV MKL_NUM_THREADS=2
 
 # ONNX Runtime specific
 ENV ONNXRUNTIME_DISABLE_CPU_AFFINITY=1
