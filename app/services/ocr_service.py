@@ -1,10 +1,8 @@
 import os
-import logging
 import cv2
 import numpy as np
 from paddleocr import PaddleOCR
-
-logger = logging.getLogger(__name__)
+from app.utils.log import logger
 
 MAX_SIDE_LENGTH = 1920
 
@@ -26,15 +24,14 @@ class OCRService:
             text_recognition_model_name="PP-OCRv6_small_rec",
             use_doc_orientation_classify=True,
             use_doc_unwarping=True,
-            use_textline_orientation=False, # Invoice usually only horizontal texts (at least important ones we need to grab)
+            use_textline_orientation=False,
             text_det_limit_side_len=1280,
             text_det_limit_type="min",
             text_rec_score_thresh=0.5,
             text_recognition_batch_size=8,
-            # textline_orientation_batch_size=8,
-            enable_hpi=True, # Enable when in Linux and has GPU for performance improvement
+            enable_hpi=True,
         )
-        logger.info("PaddleOCR pipeline initialized successfully.")
+        logger.info("PaddleOCR pipeline ready")
 
     def process_image(self, image: str | bytes) -> list[dict]:
         """Run OCR on an image.
@@ -82,8 +79,8 @@ class OCRService:
             scale = MAX_SIDE_LENGTH / max_side
             new_w = int(w * scale)
             new_h = int(h * scale)
-            logger.info(
-                "Downscaling image from %dx%d to %dx%d (longest side capped at %d)",
+            logger.debug(
+                "Downscaling {}x{} -> {}x{} (max side: {})",
                 w, h, new_w, new_h, MAX_SIDE_LENGTH,
             )
             img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
@@ -114,6 +111,7 @@ class OCRService:
                     }
                 )
 
+        logger.debug("OCR extracted {} text lines", len(text_lines))
         return text_lines
 
     def close(self) -> None:

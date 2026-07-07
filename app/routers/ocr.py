@@ -8,6 +8,7 @@ from app.utils.response import success_response, error_response
 from app.utils.date import normalize_date
 from app.utils.amount import normalize_amount
 from app.utils import document_parser
+from app.utils.log import logger
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -37,7 +38,7 @@ async def predict(request: Request, file: UploadFile = File(...), main_claim_typ
 
     file_bytes = await file.read()
     file_read_time = time.time()
-    print(f"[Latency] File read: {file_read_time - req_start_time:.4f}s")
+    logger.debug("File read: {:.4f}s", file_read_time - req_start_time)
     raw_lines = []
 
     try:
@@ -87,7 +88,7 @@ async def predict(request: Request, file: UploadFile = File(...), main_claim_typ
         )
 
     ocr_done_time = time.time()
-    print(f"[Latency] OCR/Doc processing: {ocr_done_time - file_read_time:.4f}s")
+    logger.debug("OCR/doc processing: {:.4f}s", ocr_done_time - file_read_time)
 
     text_lines = [OCRTextLine(**line) for line in raw_lines]
     ocr_result = OCRResult(
@@ -125,7 +126,7 @@ async def predict(request: Request, file: UploadFile = File(...), main_claim_typ
 
     ocr_text = "\n".join(line.text for line in text_lines).lower()
     full_prompt = f"{prompt}\n\n{ocr_text}"
-    print("OCR result:", ocr_text)
+    logger.debug("OCR result:\n{}", ocr_text)
 
     # Call the Ollama API (POST /api/chat)
     llm_api_url = f"{LLM_URL_API}/chat"
@@ -184,8 +185,8 @@ async def predict(request: Request, file: UploadFile = File(...), main_claim_typ
         )
 
     llm_end_time = time.time()
-    print(f"[Latency] LLM API Call: {llm_end_time - llm_start_time:.4f}s")
-    print(f"[Latency] Total Request: {llm_end_time - req_start_time:.4f}s")
+    logger.debug("LLM API call: {:.4f}s", llm_end_time - llm_start_time)
+    logger.debug("Total request: {:.4f}s", llm_end_time - req_start_time)
 
     return success_response(
         message="OCR and LLM analysis completed successfully.",

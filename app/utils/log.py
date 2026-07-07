@@ -72,8 +72,19 @@ class Logger:
                 "id": record["extra"].get("user_id",None)
             }
         }
+        subset = self._strip_none(subset)
         indent = 2 if self.pretty_json else None
         return json.dumps(subset, default=str, ensure_ascii=False, indent=indent)
+
+    def _strip_none(self, value: Any):
+        if isinstance(value, dict):
+            stripped = {
+                k: self._strip_none(v) for k, v in value.items() if v is not None
+            }
+            return stripped if stripped else None
+        if isinstance(value, list):
+            return [self._strip_none(item) for item in value]
+        return value
 
     def _mask_data(self, value: Any, key: str | None = None):
         if not self.masking_enabled:

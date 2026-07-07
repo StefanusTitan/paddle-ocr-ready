@@ -5,6 +5,7 @@ import subprocess
 import fitz  # PyMuPDF
 import docx
 from PIL import Image
+from app.utils.log import logger
 
 def process_gif(image_bytes: bytes) -> bytes:
     """Extracts the first frame of a GIF and returns it as PNG bytes."""
@@ -64,7 +65,7 @@ def process_doc(file_bytes: bytes) -> tuple[bool, str | list[bytes]]:
         
         # If substantial text extracted, it's a digital document
         if len(extracted_text.strip()) > 50:
-            print("THIS IS A DIGITAL DOC, NOT SCANNED")
+            logger.debug("Digital .doc detected (extracted text directly)")
             return False, extracted_text
         
         # Otherwise, it's likely a scanned document - convert pages to images for OCR

@@ -5,21 +5,20 @@ from app.routers import example, ocr
 from app.services.ocr_service import OCRService
 from app.middlewares.log import LogMiddleware
 from app.exceptions.log import LogError
+from app.utils.log import logger
 from starlette.exceptions import HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi import APIRouter
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize resources here
-    print("Application starting...")
+    logger.info("Starting application...")
     ocr_service = OCRService()
     app.state.ocr_service = ocr_service
-    print("OCR pipeline loaded.")
+    logger.info("OCR pipeline loaded")
     yield
-    # Clean up resources here
     ocr_service.close()
-    print("Application shutting down...")
+    logger.info("Application shutdown complete")
 
 app = FastAPI(lifespan=lifespan)
 log = LogError()
