@@ -4,9 +4,9 @@ from fastapi import Request
 from fastapi.exceptions import RequestValidationError, HTTPException
 from fastapi.responses import JSONResponse
 
-from app.utils.log import logger
+from app.utils.logger import logger
 
-class LogError:
+class GlobalExceptionHandler:
     async def request_validation_exception_handler(self, request: Request, exc: RequestValidationError) -> JSONResponse:
         error_details = []
         for error in exc.errors():

@@ -5,7 +5,7 @@ import subprocess
 import fitz  # PyMuPDF
 import docx
 from PIL import Image
-from app.utils.log import logger
+from app.utils.logger import logger
 
 def process_gif(image_bytes: bytes) -> bytes:
     """Extracts the first frame of a GIF and returns it as PNG bytes."""

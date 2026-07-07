@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.datastructures import FormData, UploadFile
-from app.utils.log import logger
+from app.utils.logger import logger
 import json
 import os
 import time

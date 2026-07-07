@@ -2,7 +2,7 @@ import os
 import cv2
 import numpy as np
 from paddleocr import PaddleOCR
-from app.utils.log import logger
+from app.utils.logger import logger
 
 MAX_SIDE_LENGTH = 1920
 

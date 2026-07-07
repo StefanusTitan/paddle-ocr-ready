@@ -1,12 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import httpx
 from app.routers import example, ocr
-from app.routers.ocr import get_llm_client
 from app.services.ocr_service import OCRService
-from app.middlewares.log import LogMiddleware
-from app.exceptions.log import LogError
-from app.utils.log import logger
+from app.middlewares.logging import LogMiddleware
+from app.exceptions.handlers import GlobalExceptionHandler
+from app.utils.logger import logger
 from starlette.exceptions import HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi import APIRouter
@@ -14,17 +14,25 @@ from fastapi import APIRouter
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting application...")
+    
+    # Initialize OCR Service
     ocr_service = OCRService()
     app.state.ocr_service = ocr_service
     logger.info("OCR pipeline loaded")
+    
+    # Initialize HTTP Client for LLM / external services
+    http_client = httpx.AsyncClient(timeout=60.0)
+    app.state.http_client = http_client
+    logger.info("HTTP client loaded")
+    
     yield
+    
     ocr_service.close()
-    client = get_llm_client()
-    await client.aclose()
+    await http_client.aclose()
     logger.info("Application shutdown complete")
 
 app = FastAPI(lifespan=lifespan)
-log = LogError()
+exception_handlers = GlobalExceptionHandler()
 
 # CORS configuration
 app.add_middleware(
@@ -39,9 +47,9 @@ app.add_middleware(
 app.add_middleware(LogMiddleware)
 
 # Exception handlers
-app.add_exception_handler(RequestValidationError, log.request_validation_exception_handler)
-app.add_exception_handler(HTTPException, log.http_exception_handler)
-app.add_exception_handler(Exception, log.unhandled_exception_handler)
+app.add_exception_handler(RequestValidationError, exception_handlers.request_validation_exception_handler)
+app.add_exception_handler(HTTPException, exception_handlers.http_exception_handler)
+app.add_exception_handler(Exception, exception_handlers.unhandled_exception_handler)
 
 # API v1 routes
 api_v1 = APIRouter(prefix="/api/v1")

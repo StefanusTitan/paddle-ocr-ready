@@ -1,6 +1,6 @@
 import asyncio
 
-from app.utils.log import logger
+from app.utils.logger import logger
 
 
 async def run_in_thread(func, *args, **kwargs):
