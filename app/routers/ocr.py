@@ -107,18 +107,20 @@ async def predict(request: Request, file: UploadFile = File(...), main_claim_typ
             "Extract purposes, amount, payment_method, and confidence. "
             "amount: include currency if present. "
             "payment_method: Bank Transfer|Cash|Virtual Account."
+            "confidence: 0.0-1.0 based on estimated accuracy."
         )
     elif main_claim_type == "travel":
         prompt = (
             "Extract purpose, description, budget_amount, mode_of_travel, is_roundtrip and confidence. "
             "budget_amount: include currency if present. "
             "mode_of_travel: Plane|Train|Taxi|Bus|Car|Motorcycle|Other."
+            "confidence: 0.0-1.0 based on estimated accuracy."
         )
     else:
         prompt = (
             "Extract invoice description, expense_date, amount, and confidence from this receipt. "
             "amount: include currency if present. "
-            "confidence: 0.0-1.0 based on accuracy."
+            "confidence: 0.0-1.0 based on estimated accuracy."
         )
 
     ocr_text = "\n".join(line.text for line in text_lines).lower()
